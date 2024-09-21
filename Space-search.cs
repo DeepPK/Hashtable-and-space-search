@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Diagnostics;
 
 class Node //узел
 {
@@ -36,7 +37,7 @@ class KdTree
 
         int cd = depth % k;//На какой оси будет точка
 
-        if (point[cd] < root.point[cd])//Выбираем где будет точка располагаться относительно корня
+        if (point[cd] < root.point[cd])//Выбираем где будет точка располагаться относительно нынешней ноды
         {
             root.left = InsertRec(root.left, point, depth + 1);//Спускаемся Слева
         }
@@ -44,7 +45,7 @@ class KdTree
         {
             root.right = InsertRec(root.right, point, depth + 1);//Спускаемся Справа
         }
-        return root; //Если только корень в дереве
+        return root;
     }
 
     public Node Insert(Node root, int[] point)//Вставка
@@ -67,17 +68,17 @@ class KdTree
 
     private bool SearchRec(Node root, int[] point, int depth)
     {
-        if (root == null)
+        if (root == null)//если дошли до конца, значит не нашли
         {
             return false;
         }
 
-        if (ArePointsSame(root.point, point))
+        if (ArePointsSame(root.point, point))//Если соотносится, значит нашли
         {
             return true;
         }
 
-        int cd = depth % k;
+        int cd = depth % k;//Двигаемся также, как в Insert
 
         if (point[cd] < root.point[cd])
         {
@@ -124,7 +125,7 @@ class KdTree
         return minNode( root, FindMinRec(root.left, d, depth + 1), FindMinRec(root.right, d, depth + 1), d);
     }
     
-    public Node FindMin(Node root, int d)
+    public Node FindMin(Node root, int d)//Ищем минмальное
     {
         return FindMinRec(root, d, 0);
     }
@@ -143,7 +144,7 @@ class KdTree
             return null;
         }
         int cd = depth % k;
-        if (ArePointsSame(root.point, point)) //Если мы нашли точку для удаления, то ищем минимум сначала справой, потом с левой стороны.
+        if (ArePointsSame(root.point, point)) //Если мы нашли точку для удаления, то ищем минимум справой и с левой стороны.
         {
             if (root.right != null)
             {
@@ -165,7 +166,7 @@ class KdTree
             }
             return root;
         }
-        if (point[cd] < root.point[cd])//Иначе мы просто ищем нужную ноды
+        if (point[cd] < root.point[cd])//Иначе мы просто ищем нужную ноду
         {
             root.left = DeleteNodeRec(root.left, point, depth + 1);
         }
@@ -185,26 +186,36 @@ class Program
     static void Main(string[] args)
     {
         Node root = null;
-
-        int[][] points = {
-          new int[] { 3, 6 },
-          new int[] { 17, 15 },
-          new int[] { 13, 15 },
-          new int[] { 6, 12 },
-          new int[] { 9, 1 },
-          new int[] { 2, 7 },
-          new int[] { 10, 19 }
-        };
+        //int[][] points = {
+        //new int[] { 3, 6 },
+        //new int[] { 17, 15 },
+        //new int[] { 13, 15 },
+        //new int[] { 6, 12 },
+        //new int[] { 9, 1 },
+        //new int[] { 2, 7 },
+        //new int[] { 10, 19 }
+        //};
+        int[][] points = new int[200][];
+        
+        Random random = new Random();
+        var reader = new StreamReader(@"random_points.csv");//Заполняем массив из файла
+        for (int i = 0; i < 200; i++) 
+        {
+            var line = reader.ReadLine();
+            var values = line.Split(',');
+            points[i] = new int[] { int.Parse(values[0]), int.Parse(values[1]) };
+        }
 
         KdTree tree = new KdTree(2);
 
-        for (int i = 0; i < points.Length; i++)
+        for (int i = 0; i < points.Length; i++)//заполняем дерево
         {
             root = tree.Insert(root, points[i]);
         }
 
-        int[] point1 = { 10, 19 };
+        int[] point1 = { 68, 34 };//ищем эту точку (или любую другую точку из файла)
 
+        DateTime start = DateTime.Now;
         if (tree.Search(root, point1))
         {
             Console.WriteLine("Найден");
@@ -213,9 +224,26 @@ class Program
         {
             Console.WriteLine("Нет такого");
         }
+        DateTime end = DateTime.Now;
+        using (StreamWriter writer = new StreamWriter("Space_search_time.txt", false))
+        {
+            writer.WriteLineAsync($"Время поиска определённого элемента в дереве: {end-start}ms");
+        }
+        start = DateTime.Now;
         Node min = tree.FindMin(root, 0);
-        Console.WriteLine(min.point[0] + "," + min.point[1]);
+        end = DateTime.Now;
+        using (StreamWriter writer = new StreamWriter("Space_search_time.txt", true))
+        {
+            writer.WriteLineAsync($"Время поиска минимального элемента в дереве: {end - start}ms");
+        }
+        Console.WriteLine(min.point[0] + "," + min.point[1]);//Ищем минимальное
+        start = DateTime.Now;
         root = tree.DeleteNode(root, points[0]);
-        Console.WriteLine(root.point[0] + "," + root.point[1]);
+        end = DateTime.Now;
+        using (StreamWriter writer = new StreamWriter("Space_search_time.txt", true))
+        {
+            writer.WriteLineAsync($"Время удаления из дереве: {end - start}ms");
+        }
+        Console.WriteLine(root.point[0] + "," + root.point[1]);//Удаляем корень и получаем новый корень
     }
 }
