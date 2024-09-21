@@ -1,186 +1,221 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography; //Для SHA256
-using System.Text;
 
-namespace hash_table
+class Node //узел
 {
-    public class Item //Объект HashTable
-    {
-        public string Key { get; private set; }
-        public string Value { get; private set; }
+    public int[] point;
+    public Node left;
+    public Node right;
 
-        public Item(string key, string value)
-        {
-            if (string.IsNullOrEmpty(key)) //Проверка на пустое
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-            if (string.IsNullOrEmpty(value))
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
-            Key = key;
-            Value = value;
-        }
+    public Node(int[] point)
+    {
+        this.point = point;
+        left = null;
+        right = null;
     }
 
-    public class HashTable
+}
+class KdTree
+{
+    private int k; //Сколько измерений у дерева
+    public KdTree(int k)
     {
-        private readonly byte _maxSize = 255; //Максимальный размер таблицы
-        private Dictionary<string, List<Item>> _items = null; //Список ключ значение
-        public IReadOnlyCollection<KeyValuePair<string, List<Item>>> Items => _items.ToList().AsReadOnly(); //Для вывода всей таблицы
-        public HashTable()
+        this.k = k;
+    }
+
+    public Node NewNode(int[] point) //Новый узел
+    {
+        return new Node(point);
+    }
+
+    private Node InsertRec(Node root, int[] point, int depth)
+    {
+        if (root == null)
         {
-            _items = new Dictionary<string, List<Item>>(_maxSize);
+            return NewNode(point);
         }
-        public void Insert(string key, string value)
+
+        int cd = depth % k;//На какой оси будет точка
+
+        if (point[cd] < root.point[cd])//Выбираем где будет точка располагаться относительно корня
         {
-            if (string.IsNullOrEmpty(key))
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-            if (string.IsNullOrEmpty(value))
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
+            root.left = InsertRec(root.left, point, depth + 1);//Спускаемся Слева
+        }
+        else
+        {
+            root.right = InsertRec(root.right, point, depth + 1);//Спускаемся Справа
+        }
+        return root; //Если только корень в дереве
+    }
 
-            var item = new Item(key, value);
-            var hash = GetHash(item.Key); //Создаём Хэш ключа
+    public Node Insert(Node root, int[] point)//Вставка
+    {
+        return InsertRec(root, point, 0);
+    }
 
-            List<Item> hashTableItem = null;
-            if (_items.ContainsKey(hash))
+    private bool ArePointsSame(int[] point1, int[] point2)//Проверяет равенство точек (для поиска)
+    {
+        for (int i = 0; i < k; i++)
+        {
+            if (point1[i] != point2[i])
             {
-                hashTableItem = _items[hash];
-                _items[hash].Add(item);
-
-            }
-            else {
-                hashTableItem = new List<Item> { item };
-                _items.Add(hash, hashTableItem);
+                return false;
             }
         }
-        public void Delete(string key)
+
+        return true;
+    }
+
+    private bool SearchRec(Node root, int[] point, int depth)
+    {
+        if (root == null)
         {
-            if (string.IsNullOrEmpty(key))
-            {
-                throw new ArgumentNullException(nameof(key));
-            }
-
-            var hash = GetHash(key);
-
-            if (!_items.ContainsKey(hash))
-            {
-                return;
-            }
-
-            var hashTableItem = _items[hash];//получаем ключ-значение
-
-            var item = hashTableItem.SingleOrDefault(i => i.Key == key);//получаем значение
-            if (item != null)
-            {
-                hashTableItem.Remove(item);
-            }
-
+            return false;
         }
-        public string Search(string key)
+
+        if (ArePointsSame(root.point, point))
         {
-            if (string.IsNullOrEmpty(key))
+            return true;
+        }
+
+        int cd = depth % k;
+
+        if (point[cd] < root.point[cd])
+        {
+            return SearchRec(root.left, point, depth + 1);
+        }
+
+        return SearchRec(root.right, point, depth + 1);
+    }
+
+    public bool Search(Node root, int[] point)//Поиск
+    {
+        return SearchRec(root, point, 0);
+    }
+    private Node minNode(Node x, Node y, Node z, int d)//Поиск минимальной ноды из трёх на оси d
+    {
+        Node res = x;
+        if (y != null && y.point[d] < res.point[d])
+        {
+            res = y;
+        }
+        if (z != null && z.point[d] < res.point[d])
+        {
+            res = z;
+        }
+        return res;
+    }
+    private Node FindMinRec(Node root, int d, int depth)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+        
+        int cd = depth % k;
+        
+        if (cd == d)//Если оси соотносятся, то ищем по левой стороне, если только там не null. Иначе ищем по обоим сторонам, в том числе и та нода, на которой мы находимся (root).
+        {
+            if (root.left == null)
             {
-                throw new ArgumentNullException(nameof(key));
+                return root;
             }
+            return FindMinRec(root.left, d, depth + 1);
+        }
+        return minNode( root, FindMinRec(root.left, d, depth + 1), FindMinRec(root.right, d, depth + 1), d);
+    }
+    
+    public Node FindMin(Node root, int d)
+    {
+        return FindMinRec(root, d, 0);
+    }
 
-            var hash = GetHash(key);
-
-            if (!_items.ContainsKey(hash))
+    private void CopyPoint(int[] p1, int[] p2)//Копирование точки (для удаления)
+    {
+        for (int i = 0; i < k; i++)
+        {
+            p1[i] = p2[i];
+        }
+    }
+    private Node DeleteNodeRec(Node root, int[] point, int depth)
+    {
+        if (root == null)
+        {
+            return null;
+        }
+        int cd = depth % k;
+        if (ArePointsSame(root.point, point)) //Если мы нашли точку для удаления, то ищем минимум сначала справой, потом с левой стороны.
+        {
+            if (root.right != null)
             {
+                Node min = FindMin(root.right, cd);
+                CopyPoint(root.point, min.point);
+                root.right = DeleteNodeRec(root.right, min.point, depth + 1);
+            }
+            else if (root.left != null)
+            {
+                Node min = FindMin(root.left, cd);
+                CopyPoint(root.point, min.point);
+                root.right = DeleteNodeRec(
+                    root.left, min.point, depth + 1);
+            }
+            else
+            {
+                root = null;
                 return null;
             }
-
-            var hashTableItem = _items[hash];
-
-            if (hashTableItem != null)
-            {
-                var item = hashTableItem.SingleOrDefault(i => i.Key == key);
-
-                if (item != null)
-                {
-                     return item.Value;
-                }
-            }
-             return null;
+            return root;
         }
-        private string GetHash(string value) //Для создания хеша ключа
+        if (point[cd] < root.point[cd])//Иначе мы просто ищем нужную ноды
         {
-            if (string.IsNullOrEmpty(value))
-            {
-                throw new ArgumentNullException(nameof(value));
-            }
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] inputBytes = Encoding.UTF8.GetBytes(value);
-                byte[] hashBytes = sha256.ComputeHash(inputBytes);
-                return BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
-            }
+            root.left = DeleteNodeRec(root.left, point, depth + 1);
         }
+        else
+        {
+            root.right = DeleteNodeRec(root.right, point, depth + 1);
+        }
+        return root;
     }
-    class Program
+    public Node DeleteNode(Node root, int[] point)//Удаление
     {
-        static void Main(string[] args)
+        return DeleteNodeRec(root, point, 0);
+    }
+}
+class Program
+{
+    static void Main(string[] args)
+    {
+        Node root = null;
+
+        int[][] points = {
+          new int[] { 3, 6 },
+          new int[] { 17, 15 },
+          new int[] { 13, 15 },
+          new int[] { 6, 12 },
+          new int[] { 9, 1 },
+          new int[] { 2, 7 },
+          new int[] { 10, 19 }
+        };
+
+        KdTree tree = new KdTree(2);
+
+        for (int i = 0; i < points.Length; i++)
         {
-            var hashTable = new HashTable(); //Данные из файла в HashTable
-            List<string> listA = new List<string>();
-            List<string> listB = new List<string>();
-            using (var reader = new StreamReader(@"random_data.csv"))
-            {
-                while (!reader.EndOfStream)
-                {
-                    var line = reader.ReadLine();
-                    var values = line.Split(',');
-                    listA.Add(values[0]);
-                    listB.Add(values[1]);
-                }
-            }
-            for (int i = 0; i < listA.Count; i++) 
-            {
-                hashTable.Insert(listA[i], listB[i]);
-            }
-
-            ShowHashTable(hashTable, "================================Hashtable========================================");
-            Console.ReadLine();
-
-            hashTable.Delete("cfzwqhaexs");
-            ShowHashTable(hashTable, "================================Deleted!=========================================================");
-            Console.ReadLine();
-
-            Console.WriteLine("srqcifgtoq");
-            var text = hashTable.Search("srqcifgtoq");
-            Console.WriteLine(text);
-            Console.ReadLine();
+            root = tree.Insert(root, points[i]);
         }
-        private static void ShowHashTable(HashTable hashTable, string title) //Выводит весь словарь
+
+        int[] point1 = { 10, 19 };
+
+        if (tree.Search(root, point1))
         {
-            if (hashTable == null)
-            {
-                throw new ArgumentNullException(nameof(hashTable));
-            }
-            if (string.IsNullOrEmpty(title))
-            {
-                throw new ArgumentNullException(nameof(title));
-            }
-            
-            Console.WriteLine(title);
-
-            foreach (var item in hashTable.Items)
-            {
-                Console.WriteLine(item.Key);
-                foreach (var value in item.Value)
-                {
-                    Console.WriteLine($"\t{value.Key} - {value.Value}");
-                }
-            }
-            Console.WriteLine();
+            Console.WriteLine("Найден");
         }
+        else
+        {
+            Console.WriteLine("Нет такого");
+        }
+        Node min = tree.FindMin(root, 0);
+        Console.WriteLine(min.point[0] + "," + min.point[1]);
+        root = tree.DeleteNode(root, points[0]);
+        Console.WriteLine(root.point[0] + "," + root.point[1]);
     }
 }
