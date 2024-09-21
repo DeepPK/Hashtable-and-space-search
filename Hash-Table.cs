@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography; //Для SHA256
 using System.Text;
+using System.Diagnostics;
+using System.IO;
 
 namespace hash_table
 {
@@ -129,6 +131,7 @@ namespace hash_table
     {
         static void Main(string[] args)
         {
+            var all_time = Stopwatch.StartNew();//Время
             var hashTable = new HashTable(); //Данные из файла в HashTable
             List<string> listA = new List<string>();
             List<string> listB = new List<string>();
@@ -149,14 +152,30 @@ namespace hash_table
 
             ShowHashTable(hashTable, "================================Hashtable========================================");
             Console.ReadLine();
-
+            var watch = Stopwatch.StartNew();
             hashTable.Delete("cfzwqhaexs");
+            watch.Stop();
+            using (StreamWriter writer = new StreamWriter("HashTable_time.txt", false))
+            {
+                writer.WriteLineAsync($"Время удаления из таблицы: {watch.ElapsedMilliseconds}ms");
+            }
             ShowHashTable(hashTable, "================================Deleted!=========================================================");
             Console.ReadLine();
 
             Console.WriteLine("srqcifgtoq");
+            watch = Stopwatch.StartNew();
             var text = hashTable.Search("srqcifgtoq");
+            watch.Stop();
+            using (StreamWriter writer = new StreamWriter("HashTable_time.txt", true))
+            {
+                writer.WriteLineAsync($"Время Поиска в таблице: {watch.ElapsedMilliseconds}ms");
+            }
             Console.WriteLine(text);
+            all_time.Stop();
+            using (StreamWriter writer = new StreamWriter("HashTable_time.txt", true))
+            {
+                writer.WriteLineAsync($"Общее время работы программы: {all_time.ElapsedMilliseconds}ms");
+            }
             Console.ReadLine();
         }
         private static void ShowHashTable(HashTable hashTable, string title) //Выводит весь словарь
